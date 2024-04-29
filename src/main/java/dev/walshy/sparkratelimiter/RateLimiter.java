@@ -70,6 +70,23 @@ public final class RateLimiter {
         });
     }
 
+    public void mapToMethod(@Nonnull String path, String method) {
+        Spark.before(path, (req, res) -> {
+            if (req.requestMethod() == method) {
+                final Semaphore semaphore = getSemaphore(req);
+
+                boolean rateLimited = !semaphore.tryAcquire();
+
+                res.header("X-RateLimit-Limit", String.valueOf(maxRequests));
+                res.header("X-RateLimit-Remaining", String.valueOf(semaphore.availablePermits()));
+                res.header("X-RateLimit-Reset", String.valueOf(Math.max(0, getTimeLeft())));
+
+                if (rateLimited)
+                    Spark.halt(429);
+            }
+        });
+    }
+
     public boolean tryAcquire(@Nonnull Request request) {
         return this.getSemaphore(request).tryAcquire();
     }
